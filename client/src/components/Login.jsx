@@ -1,14 +1,13 @@
-import { useState ,useEffect} from "react";
+import { useState } from "react";
 import "./Login.css";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import Cookie from "js-cookie"; // Import js-cookie
 import image from "@/assets/loginani.png";
 import logo from "@/assets/logo1.png";
-import OAuth from "./OAuth";
 import { GoogleLogin } from "@react-oauth/google";
-   
-const backendUrl = import.meta.env.VITE_API_URL;
 
+const backendUrl = import.meta.env.VITE_API_URL;
 
 function Login() {
   const [email, setEmail] = useState("");
@@ -17,12 +16,10 @@ function Login() {
   const [success, setSuccess] = useState("");
   const navigate = useNavigate();
 
- 
-
   const handleLogin = async (e) => {
     e.preventDefault();
 
-    if (email === "" || password === "") {
+    if (!email || !password) {
       setError("Please fill in all fields");
       setSuccess("");
       return;
@@ -31,44 +28,71 @@ function Login() {
     try {
       const response = await axios.post(
         `${backendUrl}/api/users/login`,
-        {
-          email,
-          password,
-        },
+        { email, password },
         { withCredentials: true }
       );
+
       console.log(response.data);
 
-      
+      if (response.data.token) {
+        Cookie.set("token", response.data.token, { expires: 1 }); // Store token in cookies for 1 day
+      }
 
       setSuccess("Login successful! Redirecting...");
       setError("");
+
       setTimeout(() => {
-        navigate("/main-page");
+        navigate("/main-page"); // Redirect to main page after login
       }, 2000);
+
       setEmail("");
       setPassword("");
     } catch (err) {
       console.error(err);
       setError(err.response?.data?.message || "Invalid email or password");
-      handlemessage();
-      setSuccess("");      
+      handleMessage();
+      setSuccess("");
     }
   };
-  const handlemessage = () => {
+
+  const handleMessage = () => {
     setTimeout(() => {
       setError("");
-  },2000);
-};
+    }, 2000);
+  };
+
   const handleRegister = () => {
     navigate("/register");
   };
+
   const handleMailVerification = () => {
     navigate("/mail-verification");
   };
 
   const handleForgotPassword = () => {
     navigate("/forgot-password");
+  };
+
+  const handleGoogleLogin = async (credentialResponse) => {
+    try {
+      console.log("Google Login Success:", credentialResponse);
+
+      const response = await axios.post(
+        `${backendUrl}/api/users/google-login`,
+        { token: credentialResponse.credential },
+        { withCredentials: true }
+      );
+
+      if (response.data.token) {
+        Cookie.set("token", response.data.token, { expires: 1 });
+        setSuccess("Login successful! Redirecting...");
+        setTimeout(() => navigate("/main-page"), 2000);
+      }
+    } catch (error) {
+      console.error("Google login failed:", error);
+      setError("Google login failed. Try again.");
+      handleMessage();
+    }
   };
 
   return (
@@ -100,6 +124,7 @@ function Login() {
                 required
               />
             </div>
+
             <div className="form-group">
               <label htmlFor="password" className="form-label">
                 Password
@@ -114,14 +139,14 @@ function Login() {
                 required
               />
             </div>
-            <GoogleLogin
-              onSuccess={(credentialResponse) => {
-                console.log(credentialResponse);
-              }}
-              onError={() => {
-                console.log("Login Failed");
-              }}
-            />
+
+            <div className="google-login-container">
+              <GoogleLogin
+                onSuccess={handleGoogleLogin}
+                onError={() => setError("Google login failed. Try again.")}
+              />
+            </div>
+
             <div className="login-links">
               <button
                 type="button"
@@ -138,20 +163,22 @@ function Login() {
                 Need an Account?
               </button>
             </div>
+
             <button type="submit" className="btn-submit">
               Sign In
             </button>
-            
+
             <button
               type="button"
               className="btn-links p-5"
               onClick={handleMailVerification}
             >
-              Registered not verified ?
+              Registered but not verified?
             </button>
           </form>
         </div>
       </div>
+
       <div className="fly-img">
         <img src={image} alt="Flying image" />
         <div className="quote-container">
